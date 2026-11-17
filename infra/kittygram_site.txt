@@ -1,5 +1,5 @@
-IP: 0.0.0.0;
-name_kittygram: https://kittygram.example.com;
-name_taski: https://taski.example.com;
-login: username;
-password: password;
+IP: 51.250.15.128;
+name_kittygram: https://pavel-kittygram.duckdns.org;
+name_taski: https://pavel-taski.duckdns.org;
+login: pavel14701;
+password: Kitty-Pr0d-2026;
