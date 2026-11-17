@@ -39,7 +39,7 @@ jobs:
       # На сервере ограничен egress до GitHub, поэтому код доставляем
       # напрямую из раннера, а не через git pull на сервере.
       - name: Pack sources
-        run: tar czf deploy.tgz --exclude='.git' --exclude='.env' .
+        run: tar czf deploy.tgz --exclude='deploy.tgz' --exclude='.git' --exclude='.env' .
 
       - name: Upload sources to server
         uses: appleboy/scp-action@v1.0.0
@@ -64,7 +64,8 @@ jobs:
             cd ${{ secrets.PROJECT_DIR }}
             tar xzf /tmp/deploy.tgz
             rm -f /tmp/deploy.tgz
-            docker compose -f docker-compose.production.yml up -d --build
+            # образы уже собраны и загружены на сервер (registry недоступен из сети ВМ)
+            docker compose -f docker-compose.production.yml up -d --no-build
             docker compose -f docker-compose.production.yml exec -T backend \
               python manage.py migrate --noinput
             docker compose -f docker-compose.production.yml exec -T backend \
