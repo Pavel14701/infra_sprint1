@@ -28,49 +28,26 @@ jobs:
         run: uv run pytest tests/test_settings.py tests/test_files.py
 
   deploy:
-    name: Деплой на сервер
+    name: Деплой (сервер сам тянет main) и проверка живого сайта
     needs: tests
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     environment: production
     steps:
-      - uses: actions/checkout@v4
+      # Из сети учебной ВМ недоступны registry и SSH из интернета,
+      # поэтому деплой pull-based: на сервере systemd-timer раз в минуту
+      # скачивает main-тарболл с codeload.github.com и перекатывает стек
+      # (скрипт /home/ubuntu/deploy_pull.sh). Здесь ждём выкатку и проверяем.
+      - name: Wait for server pickup
+        run: sleep 90
 
-      # На сервере ограничен egress до GitHub, поэтому код доставляем
-      # напрямую из раннера, а не через git pull на сервере.
-      - name: Pack sources
+      - name: Verify sites are up
         run: |
-          cd ..
-          tar czf /tmp/deploy.tgz --exclude='.git' --exclude='.env' infra_sprint1
-
-      - name: Upload sources to server
-        run: |
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/deploy_key
-          chmod 600 /tmp/deploy_key
-          scp -i /tmp/deploy_key -P ${{ secrets.SSH_PORT || 22 }} \
-            -o StrictHostKeyChecking=accept-new \
-            /tmp/deploy.tgz ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/tmp/deploy.tgz
-
-      - name: Apply and restart stack
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          script: |
-            set -e
-            cd $HOME
-            tar xzf /tmp/deploy.tgz
-            rm -f /tmp/deploy.tgz
-            cd ${{ secrets.PROJECT_DIR }}
-            # образы уже собраны и загружены на сервер (registry недоступен из сети ВМ)
-            docker compose -f docker-compose.production.yml up -d --no-build
-            docker compose -f docker-compose.production.yml exec -T backend \
-              python manage.py migrate --noinput
-            docker compose -f docker-compose.production.yml exec -T backend \
-              python manage.py collectstatic --noinput
-            docker image prune -f
+          for url in https://pavel-kittygram.duckdns.org/ https://pavel-taski.duckdns.org/; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" --max-time 20 "$url")
+            echo "$url -> $code"
+            [ "$code" = "200" ] || { echo "FAIL: $url"; exit 1; }
+          done
 
   full-check:
     name: Полная проверка живого сайта
