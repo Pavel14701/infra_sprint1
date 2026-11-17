@@ -39,17 +39,17 @@ jobs:
       # На сервере ограничен egress до GitHub, поэтому код доставляем
       # напрямую из раннера, а не через git pull на сервере.
       - name: Pack sources
-        run: tar czf deploy.tgz --exclude='deploy.tgz' --exclude='.git' --exclude='.env' .
+        run: |
+          cd ..
+          tar czf /tmp/deploy.tgz --exclude='.git' --exclude='.env' infra_sprint1
 
       - name: Upload sources to server
-        uses: appleboy/scp-action@v1.0.0
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          port: ${{ secrets.SSH_PORT || 22 }}
-          source: 'deploy.tgz'
-          target: '/tmp'
+        run: |
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+          scp -i /tmp/deploy_key -P ${{ secrets.SSH_PORT || 22 }} \
+            -o StrictHostKeyChecking=accept-new \
+            /tmp/deploy.tgz ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/tmp/deploy.tgz
 
       - name: Apply and restart stack
         uses: appleboy/ssh-action@v1.2.0
@@ -60,10 +60,10 @@ jobs:
           port: ${{ secrets.SSH_PORT || 22 }}
           script: |
             set -e
-            mkdir -p ${{ secrets.PROJECT_DIR }}
-            cd ${{ secrets.PROJECT_DIR }}
+            cd $HOME
             tar xzf /tmp/deploy.tgz
             rm -f /tmp/deploy.tgz
+            cd ${{ secrets.PROJECT_DIR }}
             # образы уже собраны и загружены на сервер (registry недоступен из сети ВМ)
             docker compose -f docker-compose.production.yml up -d --no-build
             docker compose -f docker-compose.production.yml exec -T backend \
