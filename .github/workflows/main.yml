@@ -22,7 +22,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --frozen
+        run: uv sync --frozen --python 3.13
 
       - name: Run static tests
         run: uv run pytest tests/test_settings.py tests/test_files.py
@@ -86,7 +86,7 @@ jobs:
           enable-cache: true
 
       - name: Install dependencies
-        run: uv sync --frozen
+        run: uv sync --frozen --python 3.13
 
       # даём сервисам подняться после деплоя
       - name: Wait for services
