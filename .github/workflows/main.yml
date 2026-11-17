@@ -1,0 +1,75 @@
+name: Kittygram CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+
+  tests:
+    name: Статические проверки (settings, infra)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Run static tests
+        run: uv run pytest tests/test_settings.py tests/test_files.py
+
+  deploy:
+    name: Деплой на сервер
+    needs: tests
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            set -e
+            cd ${{ secrets.PROJECT_DIR }}
+            git pull origin main
+            docker compose -f docker-compose.production.yml up -d --build
+            docker compose -f docker-compose.production.yml exec -T backend \
+              python manage.py migrate --noinput
+            docker compose -f docker-compose.production.yml exec -T backend \
+              python manage.py collectstatic --noinput
+            docker image prune -f
+
+  full-check:
+    name: Полная проверка живого сайта
+    needs: deploy
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      # даём сервисам подняться после деплоя
+      - name: Wait for services
+        run: sleep 40
+
+      - name: Run full test suite
+        run: uv run pytest tests/

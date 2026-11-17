@@ -1,0 +1,55 @@
+# Конфигурация Nginx для проекта Kittygram.
+# Блок server для Kittygram добавляется отдельным блоком в существующий
+# конфигурационный файл сервера, где уже описан проект Taski.
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name kittygram.example.com;
+
+    # Редирект на HTTPS (после получения сертификата Let's Encrypt)
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name kittygram.example.com;
+
+    ssl_certificate /etc/letsencrypt/live/kittygram.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/kittygram.example.com/privkey.pem;
+
+    # Запросы к API и админке Django (gunicorn на порту 8080)
+    location /api/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        client_max_body_size 20M;
+    }
+
+    location /admin/ {
+        proxy_pass http://127.0.0.1:8080;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        client_max_body_size 20M;
+    }
+
+    # Статика Django (панель администратора, DRF)
+    location /static/ {
+        alias /var/www/kittygram/static/;
+    }
+
+    # Фотографии котиков
+    location /media/ {
+        alias /var/www/kittygram/media/;
+    }
+
+    # Собранный фронтенд React
+    location / {
+        root /var/www/kittygram;
+        index index.html;
+        try_files $uri $uri/ /index.html;
+    }
+}

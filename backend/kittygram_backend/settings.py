@@ -3,11 +3,16 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = 'django-insecure-cg6*%6d51ef8f#4!r3*$vmxm4)abgjw8mo!4y-q*uq1!4$-89$'
+SECRET_KEY = os.getenv(
+    'SECRET_KEY',
+    'django-insecure-dev-only-not-for-production',
+)
 
-DEBUG = True
+DEBUG = False
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = os.getenv(
+    'ALLOWED_HOSTS', 'localhost,127.0.0.1'
+).split(',')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -53,12 +58,24 @@ TEMPLATES = [
 WSGI_APPLICATION = 'kittygram_backend.wsgi.application'
 
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+if os.getenv('DB_HOST'):
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv('POSTGRES_DB', 'kittygram'),
+            'USER': os.getenv('POSTGRES_USER', 'kittygram'),
+            'PASSWORD': os.getenv('POSTGRES_PASSWORD', 'kittygram'),
+            'HOST': os.getenv('DB_HOST', 'db'),
+            'PORT': os.getenv('DB_PORT', '5432'),
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -91,6 +108,7 @@ USE_TZ = True
 
 
 STATIC_URL = '/static/'
+STATIC_ROOT = BASE_DIR / 'static'
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'

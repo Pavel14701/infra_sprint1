@@ -1,0 +1,5 @@
+IP: 0.0.0.0;
+name_kittygram: https://kittygram.example.com;
+name_taski: https://taski.example.com;
+login: username;
+password: password;
